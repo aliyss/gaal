@@ -6,4 +6,6 @@ pub mod repository;
 pub enum RepositoryError {
     #[error("Not a Gaal repository at `{0}`")]
     Inexistent(String),
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
 }

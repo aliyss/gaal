@@ -1,5 +1,7 @@
 mod gaal_core;
 
+use std::fs::File;
+use std::io::prelude::*;
 use std::path::Path;
 
 use gaal_core::{
@@ -26,15 +28,37 @@ impl X {
 
 impl GaalCoreDirectoryActionsType for GaalCoreDirectoryInit {
     type PathItem = String;
+    type Data = String;
+    type Config = String;
 
-    fn make_dir(path: Vec<Self::PathItem>) -> Result<(), std::io::Error> {
+    fn make_path(path: Vec<Self::PathItem>) -> Result<(), std::io::Error> {
         std::fs::create_dir_all(Path::new(&path.join("/")))
     }
-    fn is_dir(path: Vec<Self::PathItem>) -> bool {
+    fn is_path(path: Vec<Self::PathItem>) -> bool {
         Path::new(&path.join("/")).is_dir()
     }
-    fn get_dir() -> Vec<Self::PathItem> {
+    fn get_path() -> Vec<Self::PathItem> {
         ".gal".split("/").map(|x| x.to_string()).collect()
+    }
+    fn get_data(path: Vec<Self::PathItem>) -> Result<Self::Data, std::io::Error> {
+        let mut file = File::open(Path::new(&path.join("/")))?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        Ok(contents)
+    }
+    fn save_data(path: Vec<Self::PathItem>, data: Self::Data) -> Result<(), std::io::Error> {
+        let mut file = File::create(Path::new(&path.join("/")))?;
+        file.write_all(data.as_bytes())
+    }
+    fn get_config(path: Vec<Self::PathItem>) -> Result<Self::Config, std::io::Error> {
+        let mut file = File::open(Path::new(&path.join("/")))?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        Ok(contents)
+    }
+    fn save_config(path: Vec<Self::PathItem>, config: Self::Config) -> Result<(), std::io::Error> {
+        let mut file = File::create(Path::new(&path.join("/")))?;
+        file.write_all(config.as_bytes())
     }
 }
 
