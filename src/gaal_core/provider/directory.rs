@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use crate::gaal_core::internals::repository::{repository::GaalRepository, RepositoryError};
 
 pub trait GaalCoreDirectoryActionsType {
-    type PathItem: Clone + std::fmt::Debug;
+    type PathItem: Clone + std::fmt::Debug + Into<String> + From<String>;
     type Data: Clone + std::fmt::Debug + Into<String> + From<String>;
     type Config: Clone + std::fmt::Debug + Into<String> + From<String>;
     fn make_path(path: Vec<Self::PathItem>) -> Result<(), std::io::Error>;
