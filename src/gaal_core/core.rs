@@ -1,5 +1,5 @@
 use super::{
-    internals::repository::{repository::GaalRepository, RepositoryError},
+    internals::repository::{default::GaalRepository, RepositoryError},
     provider::directory::{GaalCoreDirectory, GaalCoreDirectoryActions},
 };
 
@@ -11,6 +11,10 @@ pub struct GaalCore<GaalCoreDirectory> {
 pub trait GaalCoreTrait<GCDA: GaalCoreDirectoryActions + Clone> {
     fn new(directory: GaalCoreDirectory<GCDA>) -> Self;
     fn init(&self, path: Vec<GCDA::PathItem>) -> Result<GaalRepository<GCDA>, RepositoryError>;
+    fn derive_from_path(
+        &self,
+        path: Vec<GCDA::PathItem>,
+    ) -> Result<GaalRepository<GCDA>, RepositoryError>;
 }
 
 impl<GCDA: GaalCoreDirectoryActions + Clone> GaalCoreTrait<GCDA>
@@ -21,5 +25,11 @@ impl<GCDA: GaalCoreDirectoryActions + Clone> GaalCoreTrait<GCDA>
     }
     fn init(&self, path: Vec<GCDA::PathItem>) -> Result<GaalRepository<GCDA>, RepositoryError> {
         self.directory.init(path)
+    }
+    fn derive_from_path(
+        &self,
+        path: Vec<<GCDA>::PathItem>,
+    ) -> Result<GaalRepository<GCDA>, RepositoryError> {
+        self.directory.derive_from_path(path)
     }
 }

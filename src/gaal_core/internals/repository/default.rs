@@ -1,5 +1,3 @@
-use std::vec;
-
 use crate::gaal_core::provider::directory::{GaalCoreDirectory, GaalCoreDirectoryActions};
 
 use super::RepositoryError;
@@ -34,10 +32,10 @@ impl<'a, GCDA: GaalCoreDirectoryActions + Clone> GaalRepository<'a, GCDA> {
             path
         };
 
-        if !force && !_directory.is_path(config_path.clone()) {
+        if !force && !_directory.is_config(config_path.clone()) {
             return Err(RepositoryError::Inexistent(format!("{:?}", config_path)));
         } else {
-            _directory.save_data(config_path.clone(), "config".to_string().into())?;
+            _directory.save_config(config_path.clone(), GCDA::Config::default())?;
         }
 
         let branch_path: Vec<GCDA::PathItem> = {
@@ -125,5 +123,39 @@ impl<'a, GCDA: GaalCoreDirectoryActions + Clone> GaalRepository<'a, GCDA> {
             config,
             _directory,
         })
+    }
+
+    pub fn create(
+        work_dir: Vec<GCDA::PathItem>,
+        _directory: &'a GaalCoreDirectory<GCDA>,
+    ) -> Result<Self, RepositoryError> {
+        Self::new(work_dir, _directory, true)
+    }
+
+    pub fn derive_from_path(
+        work_dir: Vec<GCDA::PathItem>,
+        _directory: &'a GaalCoreDirectory<GCDA>,
+    ) -> Result<Self, RepositoryError> {
+        let default_gal_dir = _directory.defaults.default_gal_dir.clone();
+        let mut gaal_path = [&work_dir[..]].concat();
+        gaal_path.push(default_gal_dir);
+
+        if _directory.is_path(gaal_path.clone()) {
+            return Self::new(work_dir, _directory, false);
+        }
+
+        let parent = {
+            let mut parent = work_dir.clone();
+            parent.pop();
+            parent
+        };
+
+        if work_dir.is_empty() && parent.is_empty() {
+            return Err(RepositoryError::Inexistent(
+                "No .gal directory.".to_string(),
+            ));
+        }
+
+        Self::derive_from_path(parent, _directory)
     }
 }

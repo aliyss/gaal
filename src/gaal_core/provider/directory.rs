@@ -1,16 +1,20 @@
 use std::marker::PhantomData;
 
-use crate::gaal_core::internals::repository::{repository::GaalRepository, RepositoryError};
+use crate::gaal_core::internals::repository::{default::GaalRepository, RepositoryError};
+
+use super::directory_config::{GaalDirectoryConfigActions, GaalDirectoryConfigSectionActions};
 
 pub trait GaalCoreDirectoryActionsType {
     type PathItem: Clone + std::fmt::Debug + Into<String> + From<String>;
     type Data: Clone + std::fmt::Debug + Into<String> + From<String>;
-    type Config: Clone + std::fmt::Debug + Into<String> + From<String>;
+    type ConfigSection: GaalDirectoryConfigSectionActions + Clone + Default;
+    type Config: Clone + std::fmt::Debug + GaalDirectoryConfigActions<Self::ConfigSection> + Default;
     fn make_path(path: Vec<Self::PathItem>) -> Result<(), std::io::Error>;
     fn is_path(path: Vec<Self::PathItem>) -> bool;
     fn get_path() -> Vec<Self::PathItem>;
     fn save_data(path: Vec<Self::PathItem>, data: Self::Data) -> Result<(), std::io::Error>;
     fn get_data(path: Vec<Self::PathItem>) -> Result<Self::Data, std::io::Error>;
+    fn is_config(path: Vec<Self::PathItem>) -> bool;
     fn save_config(path: Vec<Self::PathItem>, config: Self::Config) -> Result<(), std::io::Error>;
     fn get_config(path: Vec<Self::PathItem>) -> Result<Self::Config, std::io::Error>;
 }
@@ -40,7 +44,14 @@ impl<GCDA: GaalCoreDirectoryActions> GaalCoreDirectory<GCDA> {
     }
 
     pub fn init(&self, path: Vec<GCDA::PathItem>) -> Result<GaalRepository<GCDA>, RepositoryError> {
-        GaalRepository::new(path, self, false)
+        GaalRepository::create(path, self)
+    }
+
+    pub fn derive_from_path(
+        &self,
+        path: Vec<GCDA::PathItem>,
+    ) -> Result<GaalRepository<GCDA>, RepositoryError> {
+        GaalRepository::derive_from_path(path, self)
     }
 
     pub fn make_path(&self, path: Vec<GCDA::PathItem>) -> Result<(), std::io::Error> {
@@ -65,6 +76,10 @@ impl<GCDA: GaalCoreDirectoryActions> GaalCoreDirectory<GCDA> {
 
     pub fn get_data(&self, path: Vec<GCDA::PathItem>) -> Result<GCDA::Data, std::io::Error> {
         GCDA::get_data(path)
+    }
+
+    pub fn is_config(&self, path: Vec<GCDA::PathItem>) -> bool {
+        GCDA::is_config(path)
     }
 
     pub fn save_config(
