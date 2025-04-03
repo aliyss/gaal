@@ -1,7 +1,9 @@
 mod gaal_core;
 
+use flate2::Compression;
+use flate2::{read::ZlibDecoder, write::ZlibEncoder};
 use std::fs::File;
-use std::io::prelude::*;
+use std::io::{prelude::*, BufReader};
 use std::path::Path;
 
 use gaal_core::{
@@ -11,6 +13,8 @@ use gaal_core::{
         directory_config::{
             GaalDirectoryConfig, GaalDirectoryConfigSection, GaalDirectoryConfigSectionItem,
         },
+        directory_object::{GaalCoreDirectoryObjectsActions, GaalCoreDirectoryObjectsActionsType},
+        object::default::GaalObject,
     },
 };
 
@@ -38,20 +42,53 @@ impl GaalCoreDirectoryActionsType for GaalCoreDirectoryInit {
     fn make_path(path: Vec<Self::PathItem>) -> Result<(), std::io::Error> {
         std::fs::create_dir_all(Path::new(&path.join("/")))
     }
+
+    fn make_entry(path: Vec<Self::PathItem>) -> Result<(), std::io::Error> {
+        let file_path = path.join("/");
+        Self::make_path(path[0..path.len() - 1].to_vec())?;
+        let mut file = File::create(Path::new(&file_path))?;
+        file.write_all(b"{}")
+    }
+
     fn is_path(path: Vec<Self::PathItem>) -> bool {
         Path::new(&path.join("/")).is_dir()
     }
+
+    fn is_entry(path: Vec<Self::PathItem>) -> bool {
+        Path::new(&path.join("/")).is_file()
+    }
+
     fn get_path() -> Vec<Self::PathItem> {
         todo!("Implement get_path")
     }
-    fn get_data(path: Vec<Self::PathItem>) -> Result<Self::Data, std::io::Error> {
+    fn get_data(path: Vec<Self::PathItem>, uncompress: bool) -> Result<Self::Data, std::io::Error> {
         let mut file = File::open(Path::new(&path.join("/")))?;
+
+        if uncompress {
+            let b = BufReader::new(file);
+            let mut decoder = ZlibDecoder::new(b);
+            let mut contents = String::new();
+            decoder.read_to_string(&mut contents)?;
+            return Ok(contents);
+        }
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
+
         Ok(contents)
     }
-    fn save_data(path: Vec<Self::PathItem>, data: Self::Data) -> Result<(), std::io::Error> {
+    fn save_data(
+        path: Vec<Self::PathItem>,
+        data: Self::Data,
+        compressed: bool,
+    ) -> Result<(), std::io::Error> {
         let mut file = File::create(Path::new(&path.join("/")))?;
+        if compressed {
+            let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+            encoder.write_all(data.as_bytes())?;
+            let compressed_data = encoder.finish()?;
+            return file.write_all(&compressed_data);
+        }
+
         file.write_all(data.as_bytes())
     }
     fn is_config(path: Vec<Self::PathItem>) -> bool {
@@ -73,11 +110,27 @@ impl GaalCoreDirectoryActionsType for GaalCoreDirectoryInit {
         let mut file = File::create(config_path)?;
         file.write_all(serde_json::to_string(&config)?.as_bytes())
     }
+    fn hash_object_to_path(hash: String) -> Vec<Self::PathItem> {
+        let dir = hash.chars().take(2).collect::<String>();
+        let file = hash.chars().skip(2).collect::<String>();
+        let path = vec![dir, file];
+        path
+    }
 }
 
 impl GaalCoreDirectoryActions for GaalCoreDirectoryInit {}
 
-pub type GaalCoreDirectoryBuild = GaalCoreDirectory<GaalCoreDirectoryInit>;
+#[derive(Clone)]
+pub struct GaalCoreDirectoryObjectInit;
+
+impl GaalCoreDirectoryObjectsActionsType<GaalCoreDirectoryInit> for GaalCoreDirectoryObjectInit {
+    type GaalBlob = GaalObject<String>;
+}
+
+impl GaalCoreDirectoryObjectsActions<GaalCoreDirectoryInit> for GaalCoreDirectoryObjectInit {}
+
+pub type GaalCoreDirectoryBuild =
+    GaalCoreDirectory<GaalCoreDirectoryInit, GaalCoreDirectoryObjectInit>;
 
 fn main() {
     /*
@@ -86,12 +139,28 @@ fn main() {
     let gal_core = GaalCore::new(GaalCoreDirectoryBuild::default());
     let repository =
         gal_core.derive_from_path(["", "home", "aliyss"].map(|x| x.to_string()).to_vec());
-    match repository {
-        Ok(_) => println!("Repository exists"),
+    let usable_repo = match repository {
+        Ok(repo) => repo,
         Err(e) => {
-            println!("{:?}", e.to_string())
+            println!("{:?}", e.to_string());
+            return;
+        }
+    };
+
+    let gaal_blob = GaalObject {
+        fmt: "blob".to_string(),
+        data: "Hello xWorld".to_string(),
+    };
+
+    let x = usable_repo.object_write(gaal_blob).unwrap();
+    let y = usable_repo.object_read(x);
+    match y {
+        Ok(data) => println!("{:?}", data),
+        Err(e) => {
+            println!("{:?}", e.to_string());
         }
     }
+
     // let repository = gal_core.init(vec!["/home/aliyss".to_string()]);
     // match repository {
     //     Ok(_) => println!("Repository created"),

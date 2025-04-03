@@ -1,17 +1,30 @@
-use crate::gaal_core::provider::directory::{GaalCoreDirectory, GaalCoreDirectoryActions};
+use crate::gaal_core::provider::{
+    directory::{GaalCoreDirectory, GaalCoreDirectoryActions},
+    directory_object::GaalCoreDirectoryObjectsActions,
+    object::{default::GaalObjectAction, ObjectError},
+};
 
 use super::RepositoryError;
 
-pub struct GaalRepository<'a, GCDA: GaalCoreDirectoryActions + Clone> {
+pub struct GaalRepository<
+    'a,
+    GCDA: GaalCoreDirectoryActions + Clone,
+    GCDOA: GaalCoreDirectoryObjectsActions<GCDA> + Clone,
+> {
     pub gaal: Vec<GCDA::PathItem>,
     pub config: GCDA::Config,
-    _directory: &'a GaalCoreDirectory<GCDA>,
+    _directory: &'a GaalCoreDirectory<GCDA, GCDOA>,
 }
 
-impl<'a, GCDA: GaalCoreDirectoryActions + Clone> GaalRepository<'a, GCDA> {
+impl<
+        'a,
+        GCDA: GaalCoreDirectoryActions + Clone,
+        GCDOA: GaalCoreDirectoryObjectsActions<GCDA> + Clone,
+    > GaalRepository<'a, GCDA, GCDOA>
+{
     pub fn new(
         work_dir: Vec<GCDA::PathItem>,
-        _directory: &'a GaalCoreDirectory<GCDA>,
+        _directory: &'a GaalCoreDirectory<GCDA, GCDOA>,
         force: bool,
     ) -> Result<Self, RepositoryError> {
         let default_gal_dir = _directory.defaults.default_gal_dir.clone();
@@ -100,6 +113,7 @@ impl<'a, GCDA: GaalCoreDirectoryActions + Clone> GaalRepository<'a, GCDA> {
                 "Unnamed repository; edit this file 'description' to name the repository."
                     .to_string()
                     .into(),
+                false,
             )?;
         }
 
@@ -110,7 +124,11 @@ impl<'a, GCDA: GaalCoreDirectoryActions + Clone> GaalRepository<'a, GCDA> {
         };
 
         if !_directory.is_path(head_path.clone()) {
-            _directory.save_data(head_path, "ref: refs/heads/master".to_string().into())?;
+            _directory.save_data(
+                head_path,
+                "ref: refs/heads/master".to_string().into(),
+                false,
+            )?;
         }
 
         let config = match _directory.get_config(config_path.clone()) {
@@ -127,14 +145,14 @@ impl<'a, GCDA: GaalCoreDirectoryActions + Clone> GaalRepository<'a, GCDA> {
 
     pub fn create(
         work_dir: Vec<GCDA::PathItem>,
-        _directory: &'a GaalCoreDirectory<GCDA>,
+        _directory: &'a GaalCoreDirectory<GCDA, GCDOA>,
     ) -> Result<Self, RepositoryError> {
         Self::new(work_dir, _directory, true)
     }
 
     pub fn derive_from_path(
         work_dir: Vec<GCDA::PathItem>,
-        _directory: &'a GaalCoreDirectory<GCDA>,
+        _directory: &'a GaalCoreDirectory<GCDA, GCDOA>,
     ) -> Result<Self, RepositoryError> {
         let default_gal_dir = _directory.defaults.default_gal_dir.clone();
         let mut gaal_path = [&work_dir[..]].concat();
@@ -157,5 +175,54 @@ impl<'a, GCDA: GaalCoreDirectoryActions + Clone> GaalRepository<'a, GCDA> {
         }
 
         Self::derive_from_path(parent, _directory)
+    }
+
+    pub fn object_write(&self, obj: GCDOA::GaalBlob) -> Result<String, ObjectError>
+    where
+        GCDA: GaalCoreDirectoryActions,
+    {
+        let (hash, result) = obj.hash().unwrap();
+
+        let path = self._directory.hash_object_to_path(hash.clone());
+        let object_path = {
+            let mut objects_path = self.gaal.clone();
+            objects_path.push("objects".to_string().into());
+            for opath in path.iter() {
+                objects_path.push(opath.clone());
+            }
+            objects_path
+        };
+
+        if !self._directory.is_entry(object_path.clone()) {
+            self._directory.make_entry(object_path.clone())?;
+        }
+
+        self._directory
+            .save_data(object_path, result.into(), true)?;
+
+        Ok(hash)
+    }
+
+    pub fn object_read(&self, hash: String) -> Result<GCDOA::GaalBlob, ObjectError>
+    where
+        GCDA: GaalCoreDirectoryActions,
+    {
+        let path = self._directory.hash_object_to_path(hash);
+        let object_path = {
+            let mut objects_path = self.gaal.clone();
+            objects_path.push("objects".to_string().into());
+            for opath in path.iter() {
+                objects_path.push(opath.clone());
+            }
+            objects_path
+        };
+
+        if !self._directory.is_entry(object_path.clone()) {
+            return Err(ObjectError::Inexistent(format!("{:?}", object_path)));
+        }
+
+        let data = self._directory.get_data(object_path, true)?;
+
+        GCDOA::from_hash(data.into())
     }
 }

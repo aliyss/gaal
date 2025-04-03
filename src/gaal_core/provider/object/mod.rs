@@ -1,7 +1,6 @@
 use thiserror::Error;
 
 pub mod default;
-pub mod write;
 
 #[derive(Error, Debug)]
 pub enum ObjectError {
