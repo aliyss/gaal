@@ -1,6 +1,6 @@
 use crate::gaal_core::provider::{
     directory::{GaalCoreDirectory, GaalCoreDirectoryActions},
-    directory_object::GaalCoreDirectoryObjectsActions,
+    directory_object::{GaalCoreDirectoryObjectType, GaalCoreDirectoryObjectsActions},
     object::{default::GaalObjectAction, ObjectError},
 };
 
@@ -177,11 +177,20 @@ impl<
         Self::derive_from_path(parent, _directory)
     }
 
-    pub fn object_write(&self, obj: GCDOA::GaalBlob) -> Result<String, ObjectError>
+    pub fn object_write(
+        &self,
+        obj: GaalCoreDirectoryObjectType<
+            GCDA,
+            GCDOA::GaalBlob,
+            GCDOA::GaalCommit,
+            GCDOA::GaalTag,
+            GCDOA::GaalTree,
+        >,
+    ) -> Result<String, ObjectError>
     where
         GCDA: GaalCoreDirectoryActions,
     {
-        let (hash, result) = obj.hash().unwrap();
+        let (hash, result) = GCDOA::hash(obj.clone())?;
 
         let path = self._directory.hash_object_to_path(hash.clone());
         let object_path = {
@@ -203,7 +212,19 @@ impl<
         Ok(hash)
     }
 
-    pub fn object_read(&self, hash: String) -> Result<GCDOA::GaalBlob, ObjectError>
+    pub fn object_read(
+        &self,
+        hash: String,
+    ) -> Result<
+        GaalCoreDirectoryObjectType<
+            GCDA,
+            GCDOA::GaalBlob,
+            GCDOA::GaalCommit,
+            GCDOA::GaalTag,
+            GCDOA::GaalTree,
+        >,
+        ObjectError,
+    >
     where
         GCDA: GaalCoreDirectoryActions,
     {

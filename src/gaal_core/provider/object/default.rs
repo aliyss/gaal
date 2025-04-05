@@ -7,9 +7,10 @@ pub trait GaalObjectAction<GCDA: GaalCoreDirectoryActions> {
     type Data: Clone + std::fmt::Debug + Default + From<String> + Into<String>;
     type Serialized: Clone + std::fmt::Debug + Default + ToString;
 
-    fn new() -> Self;
-    fn from_serialized(data: Self::Serialized) -> Self;
-    fn from_data(data: Self::Data) -> Self;
+    fn new(fmt: String) -> Self;
+    fn from_serialized(fmt: &str, data: Self::Serialized) -> Self;
+    fn from_data(fmt: &str, data: Self::Data) -> Self;
+    fn fmt(&self) -> Result<Self::Serialized, ObjectError>;
     fn serialize(&self) -> Result<Self::Serialized, ObjectError>;
     fn serialize_data(data: Self::Data) -> Result<Self::Serialized, ObjectError>;
     fn deserialize(&self) -> Result<Self::Data, ObjectError>;
@@ -19,7 +20,7 @@ pub trait GaalObjectAction<GCDA: GaalCoreDirectoryActions> {
         let data = self.serialize()?;
         let data_bytes = data.to_string();
         let data_len = data_bytes.len().to_string();
-        let fmt_bytes = "blob".to_string();
+        let fmt_bytes = self.fmt()?.to_string();
         let separator = "\x00".to_string();
         let all = [
             fmt_bytes,
@@ -49,25 +50,29 @@ where
     type Data = String;
     type Serialized = String;
 
-    fn new() -> Self {
+    fn new(fmt: String) -> Self {
         Self {
-            fmt: "blob".to_string(),
+            fmt,
             data: String::new(),
         }
     }
 
-    fn from_serialized(data: Self::Serialized) -> Self {
+    fn fmt(&self) -> Result<Self::Serialized, ObjectError> {
+        Ok(self.fmt.clone())
+    }
+
+    fn from_serialized(fmt: &str, data: Self::Serialized) -> Self {
         let deserialized =
             <GaalObject<String> as GaalObjectAction<GCDA>>::deserialize_data(data).unwrap();
         Self {
-            fmt: "blob".to_string(),
+            fmt: fmt.to_string(),
             data: deserialized,
         }
     }
 
-    fn from_data(data: Self::Data) -> Self {
+    fn from_data(fmt: &str, data: Self::Data) -> Self {
         Self {
-            fmt: "blob".to_string(),
+            fmt: fmt.to_string(),
             data,
         }
     }

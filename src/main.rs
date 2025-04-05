@@ -2,6 +2,8 @@ mod gaal_core;
 
 use flate2::Compression;
 use flate2::{read::ZlibDecoder, write::ZlibEncoder};
+use gaal_core::provider::object::kvlm::Kvlm;
+use gaal_core::provider::object::tree::Tree;
 use std::fs::File;
 use std::io::{prelude::*, BufReader};
 use std::path::Path;
@@ -18,7 +20,7 @@ use gaal_core::{
     },
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct GaalCoreDirectoryInit;
 
 #[derive(Clone, Default)]
@@ -125,6 +127,9 @@ pub struct GaalCoreDirectoryObjectInit;
 
 impl GaalCoreDirectoryObjectsActionsType<GaalCoreDirectoryInit> for GaalCoreDirectoryObjectInit {
     type GaalBlob = GaalObject<String>;
+    type GaalCommit = GaalObject<Kvlm>;
+    type GaalTag = GaalObject<String>;
+    type GaalTree = GaalObject<Tree>;
 }
 
 impl GaalCoreDirectoryObjectsActions<GaalCoreDirectoryInit> for GaalCoreDirectoryObjectInit {}
@@ -147,12 +152,18 @@ fn main() {
         }
     };
 
-    let gaal_blob = GaalObject {
-        fmt: "blob".to_string(),
-        data: "Hello xWorld".to_string(),
-    };
+    let data = "Subject Hello\n\
+            From Alice\n\
+            To Bob\n\
+            MultilineField This is a\n \
+             multiline\n \
+             message\n\
+            \n\
+            This is the message \n\
+            body";
+    let gaal_commit = GaalCoreDirectoryObjectInit::new_object("tree".to_string(), data.to_string());
 
-    let x = usable_repo.object_write(gaal_blob).unwrap();
+    let x = usable_repo.object_write(gaal_commit).unwrap();
     let y = usable_repo.object_read(x);
     match y {
         Ok(data) => println!("{:?}", data),

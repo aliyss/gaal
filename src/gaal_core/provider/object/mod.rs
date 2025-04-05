@@ -1,6 +1,8 @@
 use thiserror::Error;
 
 pub mod default;
+pub mod kvlm;
+pub mod tree;
 
 #[derive(Error, Debug)]
 pub enum ObjectError {
@@ -8,4 +10,6 @@ pub enum ObjectError {
     Inexistent(String),
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
+    #[error("Invalid data: {0}")]
+    InvalidData(String),
 }
